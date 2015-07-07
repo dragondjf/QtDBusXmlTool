@@ -50,7 +50,7 @@ class DBusToXmlTool(QFrame):
     default_path = "/com/deepin/menu"
     default_interface = "org.freedesktop.DBus.Introspectable"
 
-    default_xml2cpp = "/home/djf/Qt5.4.0/5.4/gcc_64/bin/qdbusxml2cpp"
+    default_xml2cpp = "/home/djf/opt/Qt5.4.0/5.4/gcc_64/bin/qdbusxml2cpp"
 
     unused_interface = [
         u'org.freedesktop.DBus.Introspectable',
@@ -61,8 +61,26 @@ class DBusToXmlTool(QFrame):
 
     doctype = """<!DOCTYPE node PUBLIC '-//freedesktop//DTD D-BUS Object Introspection 1.0//EN' 'http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd'>"""
 
+    style = '''
+        QFrame#DBusToXmlTool{
+            background-color: qradialgradient(spread:pad, cx:0.5, cy:0.5, radius:1, fx:0.5, fy:0.5, stop:0 rgba(119, 255, 255, 255), stop:1 rgba(32, 127, 155, 255));
+        }
+        QLabel{
+            background-color: transparent;
+        }
+
+        QCheckBox {
+            color: black;
+        }
+
+        QLineEdit:read-only {
+            background: lightgray;
+        }
+    '''
+
     def __init__(self, parent=None):
         super(DBusToXmlTool, self).__init__(parent)
+        self.setObjectName("DBusToXmlTool")
         self.initUI()
         self.initConnect()
 
@@ -76,6 +94,7 @@ class DBusToXmlTool(QFrame):
 
         self.interfaceLabel = QLabel("Interface Name:")
         self.interfaceLineEdit = QLineEdit(self.default_interface)
+        self.interfaceLineEdit.setReadOnly(True)
 
         self.qdbusxml2cppLabel = QLabel("qdbusxml2cpp path:")
         self.xml2cppLineEdit = QLineEdit(self.default_xml2cpp)
@@ -84,16 +103,43 @@ class DBusToXmlTool(QFrame):
         xml2cppLayout.addWidget(self.xml2cppLineEdit)
         xml2cppLayout.addWidget(self.browserButton)
 
-        self.interfacePrefixLabel = QLabel("Interface Prefix Name:")
-        self.interfacePrefixLineEdit = QLineEdit()
 
-        self.xmlLabel = QLabel("xml view:")
+        self.interfaceFolderLabel = QLabel("Ouput Interface File Folder:")
+
+        self.folderButton = QPushButton("...")
+        self.interfaceFolderLineEdit = QLineEdit(os.getcwd())
+        folderLayout = QHBoxLayout()
+        folderLayout.addWidget(self.interfaceFolderLineEdit)
+        folderLayout.addWidget(self.folderButton)
+
+        
+
+        self.interfaceHNameLabel = QLabel("Ouput Interface File Name:")
+        self.interfaceHNameLineEdit = QLineEdit()
+
+        self.interfaceClassNameCheckBox = QCheckBox("Interface Class Name:")
+        self.interfaceClassNameCheckBox.setCheckState(Qt.Checked)
+
+        self.interfaceClassNameLineEdit = QLineEdit("Interface")
+
+        self.checkXmlButton = QPushButton("check xml")
+        self.checkCppButton = QPushButton("check cpp")
+        self.openCurrentFolder = QPushButton("Open Output Folder")
+        checkLayout = QVBoxLayout()
+        checkLayout.addWidget(self.checkXmlButton)
+        checkLayout.addWidget(self.checkCppButton)
+        checkLayout.addStretch()
+        checkLayout.addWidget(self.openCurrentFolder)
+
         self.xmlViwer = QTextEdit()
         self.xmlViwer.setAcceptRichText(True)
 
-        buttonLayout = QHBoxLayout()
+        self.nameSpaceCheckBox = QCheckBox("NameSpace off")
+        self.nameSpaceCheckBox.setCheckState(Qt.Checked)
+
         self.generateButton = QPushButton("generate")
         self.clearButton = QPushButton("clear")
+        buttonLayout = QHBoxLayout()
         buttonLayout.addStretch()
         buttonLayout.addWidget(self.generateButton)
         buttonLayout.addWidget(self.clearButton)
@@ -109,19 +155,27 @@ class DBusToXmlTool(QFrame):
         layout.addWidget(self.interfaceLabel, 2, 0)
         layout.addWidget(self.interfaceLineEdit, 2, 1,)
 
-
         layout.addWidget(self.qdbusxml2cppLabel, 3, 0)
         layout.addLayout(xml2cppLayout, 3, 1)
 
-        layout.addWidget(self.interfacePrefixLabel, 4, 0)
-        layout.addWidget(self.interfacePrefixLineEdit, 4, 1)
+        layout.addWidget(self.interfaceFolderLabel, 4, 0)
+        layout.addLayout(folderLayout, 4, 1)
 
-        layout.addLayout(buttonLayout, 5, 1)
+        layout.addWidget(self.interfaceHNameLabel, 5, 0)
+        layout.addWidget(self.interfaceHNameLineEdit, 5, 1)
 
-        layout.addWidget(self.xmlLabel, 6, 0, Qt.AlignTop)
-        layout.addWidget(self.xmlViwer, 6, 1)
+        layout.addWidget(self.interfaceClassNameCheckBox, 6, 0)
+        layout.addWidget(self.interfaceClassNameLineEdit, 6, 1)
+
+        layout.addWidget(self.nameSpaceCheckBox, 7, 0)
+        layout.addLayout(buttonLayout, 7, 1)
+
+        layout.addLayout(checkLayout, 8, 0, Qt.AlignTop)
+        layout.addWidget(self.xmlViwer, 8, 1)
 
         self.setLayout(layout)
+
+        self.setStyleSheet(self.style)
 
 
     def initConnect(self):
@@ -129,16 +183,27 @@ class DBusToXmlTool(QFrame):
         self.clearButton.clicked.connect(self.clearAbandonFiles)
         self.browserButton.clicked.connect(self.changeXml2cppPath)
 
+        self.checkXmlButton.clicked.connect(self.viewXml)
+        self.checkCppButton.clicked.connect(self.viewCpp)
+
+        self.interfaceHNameLineEdit.textChanged.connect(self.updateClassNameLineEdit)
+
     @property
     def xmlPath(self):
         return "%s.xml" % self.interfaceLineEdit.text()\
 
     @property
     def interface_h(self):
-        prefix = self.interfacePrefixLineEdit.text()
+        prefix = self.interfaceHNameLineEdit.text()
         prefix_interface_h = "%s_interface.h" % prefix
         return prefix_interface_h
 
+    @property
+    def interface_className(self):
+        return self.interfaceClassNameLineEdit.text()
+
+    def updateClassNameLineEdit(self, text):
+        self.interfaceClassNameLineEdit.setText(text.capitalize() + "Interface")
 
     def updateXmlViewer(self):
         service = self.serviceLineEdit.text()
@@ -167,7 +232,7 @@ class DBusToXmlTool(QFrame):
 
     def changeXml2cppPath(self):
         options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
+        # options |= QFileDialog.DontUseNativeDialog
         fileName, _ = QFileDialog.getOpenFileName(self,
                 "QFileDialog.getOpenFileName()", "",
                 "All Files (*)", options=options)
@@ -197,11 +262,35 @@ class DBusToXmlTool(QFrame):
 
     def xml2cpp(self):
         program = self.xml2cppLineEdit.text()
-        QProcess.execute(program, ['-p', self.interface_h , self.xmlPath])
+        isClassNameChecked = self.interfaceClassNameCheckBox.checkState() == Qt.Checked
+        isNameSpaceOff = self.nameSpaceCheckBox.checkState() == Qt.Checked
+
+        if isClassNameChecked and isNameSpaceOff:
+            QProcess.execute(program, ['-N', '-p', self.interface_h ,'-c', self.interface_className, self.xmlPath])
+        elif isClassNameChecked and not isNameSpaceOff:
+            QProcess.execute(program, ['-p', self.interface_h ,'-c', self.interface_className, self.xmlPath])
+        elif not isClassNameChecked and isNameSpaceOff:
+            QProcess.execute(program, ['-N', '-p', self.interface_h , self.xmlPath])
+        else:
+            QProcess.execute(program, ['-p', self.interface_h , self.xmlPath])
+
+    def viewXml(self):
+        if os.path.exists(self.xmlPath):
+            with open(self.xmlPath, 'r') as f:
+                content = f.read()
+            self.xmlViwer.setPlainText(content)
+
+    def viewCpp(self):
+        if os.path.exists(self.interface_h):
+            with open(self.interface_h, 'r') as f:
+                content = f.read()
+            self.xmlViwer.setPlainText(content)
 
     def clearAbandonFiles(self):
-        QFile(self.interface_h).remove()
-        QFile(self.xmlPath).remove()
+        if os.path.exists(self.interface_h):
+            QFile(self.interface_h).remove()
+        if os.path.exists(self.xmlPath):
+            QFile(self.xmlPath).remove()
         self.xmlViwer.clear()
 
 if __name__ == '__main__':
