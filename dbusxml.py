@@ -76,13 +76,21 @@ class DBusToXmlTool(QFrame):
         QLineEdit:read-only {
             background: lightgray;
         }
+        QListView::item {
+            height: 20;
+        }
     '''
 
     def __init__(self, parent=None):
         super(DBusToXmlTool, self).__init__(parent)
         self.setObjectName("DBusToXmlTool")
+        self.initData()
         self.initUI()
         self.initConnect()
+
+    def initData(self):
+        self.interfaceCheckBoxs = []
+        self.xmlstring = ''
 
     def initUI(self):
         self.resize(800, 600)
@@ -122,18 +130,6 @@ class DBusToXmlTool(QFrame):
 
         self.interfaceClassNameLineEdit = QLineEdit("Interface")
 
-        self.checkXmlButton = QPushButton("check xml")
-        self.checkCppButton = QPushButton("check cpp")
-        self.openCurrentFolderButton = QPushButton("Open Output Folder")
-        checkLayout = QVBoxLayout()
-        checkLayout.addWidget(self.checkXmlButton)
-        checkLayout.addWidget(self.checkCppButton)
-        checkLayout.addStretch()
-        checkLayout.addWidget(self.openCurrentFolderButton)
-
-        self.xmlViwer = QTextEdit()
-        self.xmlViwer.setAcceptRichText(True)
-
         self.nameSpaceCheckBox = QCheckBox("NameSpace off")
         self.nameSpaceCheckBox.setCheckState(Qt.Checked)
 
@@ -143,6 +139,25 @@ class DBusToXmlTool(QFrame):
         buttonLayout.addStretch()
         buttonLayout.addWidget(self.generateButton)
         buttonLayout.addWidget(self.clearButton)
+
+        self.checkXmlButton = QPushButton("check xml")
+        self.checkCppButton = QPushButton("check cpp")
+        self.openCurrentFolderButton = QPushButton("Open Output Folder")
+        checkLayout = QVBoxLayout()
+        checkLayout.addWidget(self.checkXmlButton)
+        checkLayout.addWidget(self.checkCppButton)
+        checkLayout.addStretch()
+        checkLayout.addWidget(self.openCurrentFolderButton)
+
+        viewSpliter = QSplitter()
+        self.interfaceListWidget = QListWidget()
+        self.xmlViwer = QTextEdit()
+        self.xmlViwer.setAcceptRichText(True)
+        viewSpliter.addWidget(self.interfaceListWidget)
+        viewSpliter.addWidget(self.xmlViwer)
+
+        viewSpliter.setStretchFactor(0, 2)
+        viewSpliter.setStretchFactor(1, 3)
 
         layout = QGridLayout()
 
@@ -171,11 +186,12 @@ class DBusToXmlTool(QFrame):
         layout.addLayout(buttonLayout, 7, 1)
 
         layout.addLayout(checkLayout, 8, 0, Qt.AlignTop)
-        layout.addWidget(self.xmlViwer, 8, 1)
+        layout.addWidget(viewSpliter, 8, 1)
 
         self.setLayout(layout)
 
         self.setStyleSheet(self.style)
+
 
 
     def initConnect(self):
@@ -186,6 +202,7 @@ class DBusToXmlTool(QFrame):
         self.checkXmlButton.clicked.connect(self.viewXml)
         self.checkCppButton.clicked.connect(self.viewCpp)
 
+        self.serviceLineEdit.textChanged.connect(self.updatePathLineEdit)
         self.interfaceHNameLineEdit.textChanged.connect(self.updateClassNameLineEdit)
 
         self.folderButton.clicked.connect(self.changeFolder)
@@ -193,17 +210,21 @@ class DBusToXmlTool(QFrame):
 
     @property
     def xmlPath(self):
-        return "%s.xml" % self.interfaceLineEdit.text()\
+        return  os.path.join(self.interfaceFolderLineEdit.text(), "%s.xml" % self.interfaceHNameLineEdit.text())
 
     @property
     def interface_h(self):
         prefix = self.interfaceHNameLineEdit.text()
         prefix_interface_h = "%s_interface.h" % prefix
-        return prefix_interface_h
+        return os.path.join(self.interfaceFolderLineEdit.text(), prefix_interface_h)
 
     @property
     def interface_className(self):
         return self.interfaceClassNameLineEdit.text()
+
+    def updatePathLineEdit(self, text):
+        ret = text.replace('.', '/')
+        self.pathLineEdit.setText('/%s' % ret)
 
     def updateClassNameLineEdit(self, text):
         self.interfaceClassNameLineEdit.setText(text.capitalize() + "Interface")
@@ -218,41 +239,86 @@ class DBusToXmlTool(QFrame):
         reply = QDBusReply(sessionBus.call(dbusMessage))
         if reply.isValid():
             value = reply.value()
-            s = self.getAvaiableInterface(value)
-            text = self.doctype + '\n' + s
-
-            with open(self.xmlPath, 'w') as f:
-                f.write(text)
-
-            self.xml2cpp()
+            self.xmlstring = value
+            self.updateListWidget()
+            self.refreshViewer()
         else:
             text = "message:    %s \nname:         %s \ndetail:         %s" % (reply.error().message(),
                  reply.error().name(),
                  DBusError[reply.error().type()]
                 )
         
-        self.xmlViwer.setPlainText(text)
+            self.xmlViwer.setPlainText(text)
 
     def changeXml2cppPath(self):
         options = QFileDialog.Options()
-        # options |= QFileDialog.DontUseNativeDialog
+        options |= QFileDialog.DontUseNativeDialog
         fileName, _ = QFileDialog.getOpenFileName(self,
                 "QFileDialog.getOpenFileName()", "",
                 "All Files (*)", options=options)
         if fileName:
             self.xml2cppLineEdit.setText(fileName)
 
-    def getAvaiableInterface(self, value):
+    def updateListWidget(self):
         document = QDomDocument()
-        document.setContent(value)
+        document.setContent(self.xmlstring)
+        rootElement =  document.documentElement()
+        nodes = []
+        node = rootElement.firstChild();
+        parentNode = node.parentNode()
+
+        self.interfaceCheckBoxs = {}
+        self.interfaceListWidget.clear()
+        while not node.isNull():
+            element = node.toElement()
+            name = element.attribute("name")
+            item = QListWidgetItem()
+            nameCheckBox = QCheckBox(name)
+            self.interfaceListWidget.addItem(item)
+            self.interfaceListWidget.setItemWidget(item, nameCheckBox)
+            self.interfaceCheckBoxs.update({name: nameCheckBox})
+            if name in self.unused_interface:
+                nameCheckBox.setCheckState(Qt.Unchecked)
+            else:
+                nameCheckBox.setCheckState(Qt.Checked)
+
+            nameCheckBox.stateChanged.connect(self.refreshViewer)
+
+            node = node.nextSibling()
+
+    def refreshViewer(self, state=1):
+        count = 0
+        for checkBox in self.interfaceCheckBoxs.values():
+            if checkBox.checkState() == Qt.Checked:
+                count += 1
+
+        if count > 1:
+            self.interfaceClassNameCheckBox.setCheckState(Qt.Unchecked)
+
+        s = self.getAvaiableInterface()
+        text = self.doctype + '\n' + s
+        with open(self.xmlPath, 'w') as f:
+            f.write(text)
+        self.xmlViwer.setPlainText(text)
+        self.xml2cpp()
+
+    def getAvaiableInterface(self):
+        document = QDomDocument()
+        document.setContent(self.xmlstring)
         rootElement =  document.documentElement()
         unusedNodes = []
         node = rootElement.firstChild();
         parentNode = node.parentNode()
+
         while not node.isNull():
             element = node.toElement()
-            if element.attribute("name") in self.unused_interface:
+            name = element.attribute("name")
+
+            checkBox = self.interfaceCheckBoxs[name]
+
+            if checkBox.checkState() == Qt.Unchecked:
                 unusedNodes.append(node)
+
             node = node.nextSibling()
         for node in  unusedNodes:
             parentNode.removeChild(node)
