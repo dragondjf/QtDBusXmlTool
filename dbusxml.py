@@ -124,12 +124,12 @@ class DBusToXmlTool(QFrame):
 
         self.checkXmlButton = QPushButton("check xml")
         self.checkCppButton = QPushButton("check cpp")
-        self.openCurrentFolder = QPushButton("Open Output Folder")
+        self.openCurrentFolderButton = QPushButton("Open Output Folder")
         checkLayout = QVBoxLayout()
         checkLayout.addWidget(self.checkXmlButton)
         checkLayout.addWidget(self.checkCppButton)
         checkLayout.addStretch()
-        checkLayout.addWidget(self.openCurrentFolder)
+        checkLayout.addWidget(self.openCurrentFolderButton)
 
         self.xmlViwer = QTextEdit()
         self.xmlViwer.setAcceptRichText(True)
@@ -187,6 +187,8 @@ class DBusToXmlTool(QFrame):
         self.checkCppButton.clicked.connect(self.viewCpp)
 
         self.interfaceHNameLineEdit.textChanged.connect(self.updateClassNameLineEdit)
+
+        self.openCurrentFolderButton.clicked.connect(self.openCurrentFolder)
 
     @property
     def xmlPath(self):
@@ -285,6 +287,9 @@ class DBusToXmlTool(QFrame):
             with open(self.interface_h, 'r') as f:
                 content = f.read()
             self.xmlViwer.setPlainText(content)
+
+    def openCurrentFolder(self):
+        QDesktopServices.openUrl(QUrl(self.interfaceFolderLineEdit.text()))
 
     def clearAbandonFiles(self):
         if os.path.exists(self.interface_h):
