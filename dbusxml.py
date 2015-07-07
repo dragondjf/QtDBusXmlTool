@@ -188,6 +188,7 @@ class DBusToXmlTool(QFrame):
 
         self.interfaceHNameLineEdit.textChanged.connect(self.updateClassNameLineEdit)
 
+        self.folderButton.clicked.connect(self.changeFolder)
         self.openCurrentFolderButton.clicked.connect(self.openCurrentFolder)
 
     @property
@@ -238,8 +239,8 @@ class DBusToXmlTool(QFrame):
         fileName, _ = QFileDialog.getOpenFileName(self,
                 "QFileDialog.getOpenFileName()", "",
                 "All Files (*)", options=options)
-
-        self.xml2cppLineEdit.setText(fileName)
+        if fileName:
+            self.xml2cppLineEdit.setText(fileName)
 
     def getAvaiableInterface(self, value):
         document = QDomDocument()
@@ -287,6 +288,14 @@ class DBusToXmlTool(QFrame):
             with open(self.interface_h, 'r') as f:
                 content = f.read()
             self.xmlViwer.setPlainText(content)
+
+    def changeFolder(self):
+        options = QFileDialog.DontResolveSymlinks | QFileDialog.ShowDirsOnly
+        directory = QFileDialog.getExistingDirectory(self,
+                "QFileDialog.getExistingDirectory()",
+                self.interfaceFolderLineEdit.text(), options=options)
+        if directory:
+            self.interfaceFolderLineEdit.setText(directory)
 
     def openCurrentFolder(self):
         QDesktopServices.openUrl(QUrl(self.interfaceFolderLineEdit.text()))
