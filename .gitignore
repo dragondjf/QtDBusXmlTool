@@ -56,5 +56,6 @@ docs/_build/
 # PyBuilder
 target/
 
-*_interface.h
+*.h
 *.xml
+*.cpp

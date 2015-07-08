@@ -3,6 +3,7 @@
 
 import os
 import sys
+import shutil
 
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -140,11 +141,13 @@ class DBusToXmlTool(QFrame):
         buttonLayout.addWidget(self.generateButton)
         buttonLayout.addWidget(self.clearButton)
 
-        self.checkXmlButton = QPushButton("check xml")
-        self.checkCppButton = QPushButton("check cpp")
+        self.checkXmlButton = QPushButton("check .xml")
+        self.checkHButton = QPushButton("check .h")
+        self.checkCppButton = QPushButton("check .cpp")
         self.openCurrentFolderButton = QPushButton("Open Output Folder")
         checkLayout = QVBoxLayout()
         checkLayout.addWidget(self.checkXmlButton)
+        checkLayout.addWidget(self.checkHButton)
         checkLayout.addWidget(self.checkCppButton)
         checkLayout.addStretch()
         checkLayout.addWidget(self.openCurrentFolderButton)
@@ -200,6 +203,7 @@ class DBusToXmlTool(QFrame):
         self.browserButton.clicked.connect(self.changeXml2cppPath)
 
         self.checkXmlButton.clicked.connect(self.viewXml)
+        self.checkHButton.clicked.connect(self.viewH)
         self.checkCppButton.clicked.connect(self.viewCpp)
 
         self.serviceLineEdit.textChanged.connect(self.updatePathLineEdit)
@@ -209,14 +213,24 @@ class DBusToXmlTool(QFrame):
         self.openCurrentFolderButton.clicked.connect(self.openCurrentFolder)
 
     @property
+    def outPutFolder(self):
+        return self.interfaceFolderLineEdit.text()
+
+    @property
     def xmlPath(self):
         return  os.path.join(self.interfaceFolderLineEdit.text(), "%s.xml" % self.interfaceHNameLineEdit.text())
 
     @property
     def interface_h(self):
         prefix = self.interfaceHNameLineEdit.text()
-        prefix_interface_h = "%s_interface.h" % prefix
-        return os.path.join(self.interfaceFolderLineEdit.text(), prefix_interface_h)
+        interface_h = "%s_interface.h" % prefix
+        return interface_h
+
+    @property
+    def interface_cpp(self):
+        prefix = self.interfaceHNameLineEdit.text()
+        interface_cpp = "%s_interface.cpp" % prefix
+        return interface_cpp
 
     @property
     def interface_className(self):
@@ -335,23 +349,36 @@ class DBusToXmlTool(QFrame):
         isNameSpaceOff = self.nameSpaceCheckBox.checkState() == Qt.Checked
 
         if isClassNameChecked and isNameSpaceOff:
-            QProcess.execute(program, ['-N', '-p', self.interface_h ,'-c', self.interface_className, self.xmlPath])
+            QProcess.execute(program, ['-N', '-p', "%s:%s"%(self.interface_h, self.interface_cpp) ,'-c', self.interface_className, self.xmlPath])
         elif isClassNameChecked and not isNameSpaceOff:
-            QProcess.execute(program, ['-p', self.interface_h ,'-c', self.interface_className, self.xmlPath])
+            QProcess.execute(program, ['-p', "%s:%s"%(self.interface_h, self.interface_cpp) ,'-c', self.interface_className, self.xmlPath])
         elif not isClassNameChecked and isNameSpaceOff:
-            QProcess.execute(program, ['-N', '-p', self.interface_h , self.xmlPath])
+            QProcess.execute(program, ['-N', '-p', "%s:%s"%(self.interface_h, self.interface_cpp) , self.xmlPath])
         else:
-            QProcess.execute(program, ['-p', self.interface_h , self.xmlPath])
+            QProcess.execute(program, ['-p', "%s:%s"%(self.interface_h, self.interface_cpp) , self.xmlPath])
+
+
+        for filename in [self.interface_h, self.interface_cpp, self.xmlPath]:
+            shutil.move(os.path.join(os.getcwd(), filename), os.path.join(self.interfaceFolderLineEdit.text(), filename))
 
     def viewXml(self):
-        if os.path.exists(self.xmlPath):
-            with open(self.xmlPath, 'r') as f:
+        fpath = os.path.join(self.outPutFolder, self.xmlPath)
+        if os.path.exists(fpath):
+            with open(fpath, 'r') as f:
+                content = f.read()
+            self.xmlViwer.setPlainText(content)
+
+    def viewH(self):
+        fpath = os.path.join(self.outPutFolder, self.interface_h)
+        if os.path.exists(fpath):
+            with open(fpath, 'r') as f:
                 content = f.read()
             self.xmlViwer.setPlainText(content)
 
     def viewCpp(self):
-        if os.path.exists(self.interface_h):
-            with open(self.interface_h, 'r') as f:
+        fpath = os.path.join(self.outPutFolder, self.interface_cpp)
+        if os.path.exists(fpath):
+            with open(fpath, 'r') as f:
                 content = f.read()
             self.xmlViwer.setPlainText(content)
 
